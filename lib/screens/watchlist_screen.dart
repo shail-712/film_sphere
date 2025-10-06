@@ -12,7 +12,7 @@ class WatchlistScreen extends StatefulWidget {
 class _WatchlistScreenState extends State<WatchlistScreen> {
   String _selectedFilter = 'All';
 
-  final List<String> filters = ['All', 'Movies', 'TV Shows', 'Want to Watch'];
+  final List<String> filters = ['All', 'Planning', 'Watching', 'Completed', 'Dropped'];
 
   @override
   Widget build(BuildContext context) {
