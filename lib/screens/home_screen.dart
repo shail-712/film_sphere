@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widget/movie_card.dart';
 import '../widget/category_chip.dart';
 import '../models/movie.dart';
+import '../services/tmdb_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -12,7 +13,18 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TMDBService _tmdbService = TMDBService();
+  
   String _selectedCategory = 'All';
+  List<Movie> _trendingMovies = [];
+  List<Movie> _topRatedMovies = [];
+  List<Movie> _recommendedMovies = [];
+  List<Movie> _searchResults = [];
+  
+  bool _isLoadingTrending = true;
+  bool _isLoadingTopRated = true;
+  bool _isLoadingRecommended = true;
+  bool _isSearching = false;
 
   final List<String> categories = [
     'All',
@@ -23,6 +35,150 @@ class _HomeScreenState extends State<HomeScreen> {
     'Horror',
     'Romance',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMovies();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+    if (query.isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _searchResults = [];
+      });
+    } else {
+      _performSearch(query);
+    }
+  }
+
+  Future<void> _performSearch(String query) async {
+    setState(() => _isSearching = true);
+    
+    try {
+      final results = await _tmdbService.searchMovies(query);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+        });
+      }
+    } catch (e) {
+      print('Search error: $e');
+    }
+  }
+
+  Future<void> _loadMovies() async {
+    // Load trending movies
+    _loadTrendingMovies();
+    
+    // Load top rated movies
+    _loadTopRatedMovies();
+    
+    // Load recommended movies (using upcoming as recommendation)
+    _loadRecommendedMovies();
+  }
+
+  Future<void> _loadTrendingMovies() async {
+    try {
+      final movies = await _tmdbService.getTrendingMovies(timeWindow: 'week');
+      if (mounted) {
+        setState(() {
+          _trendingMovies = movies;
+          _isLoadingTrending = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading trending movies: $e');
+      if (mounted) {
+        setState(() {
+          _trendingMovies = Movie.trendingMovies;
+          _isLoadingTrending = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadTopRatedMovies() async {
+    try {
+      final movies = await _tmdbService.getTopRatedMovies();
+      if (mounted) {
+        setState(() {
+          _topRatedMovies = movies;
+          _isLoadingTopRated = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading top rated movies: $e');
+      if (mounted) {
+        setState(() {
+          _topRatedMovies = Movie.topRatedMovies;
+          _isLoadingTopRated = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadRecommendedMovies() async {
+    try {
+      final movies = await _tmdbService.getUpcomingMovies();
+      if (mounted) {
+        setState(() {
+          _recommendedMovies = movies;
+          _isLoadingRecommended = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading recommended movies: $e');
+      if (mounted) {
+        setState(() {
+          _recommendedMovies = Movie.recommendedMovies;
+          _isLoadingRecommended = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMoviesByCategory(String category) async {
+    if (category == 'All') {
+      _loadMovies();
+      return;
+    }
+
+    final genreId = TMDBService.getGenreId(category);
+    if (genreId == null) return;
+
+    setState(() {
+      _isLoadingTrending = true;
+      _isLoadingTopRated = true;
+      _isLoadingRecommended = true;
+    });
+
+    try {
+      final movies = await _tmdbService.getMoviesByGenre(genreId);
+      if (mounted) {
+        setState(() {
+          _trendingMovies = movies.take(10).toList();
+          _topRatedMovies = movies.skip(10).take(10).toList();
+          _recommendedMovies = movies.skip(20).take(10).toList();
+          _isLoadingTrending = false;
+          _isLoadingTopRated = false;
+          _isLoadingRecommended = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading movies by category: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingTrending = false;
+          _isLoadingTopRated = false;
+          _isLoadingRecommended = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,10 +227,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icons.search_rounded,
                       color: Colors.white.withOpacity(0.4),
                     ),
-                    suffixIcon: Icon(
-                      Icons.mic_rounded,
-                      color: Colors.white.withOpacity(0.4),
-                    ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(
+                              Icons.clear_rounded,
+                              color: Colors.white.withOpacity(0.4),
+                            ),
+                            onPressed: () {
+                              _searchController.clear();
+                            },
+                          )
+                        : Icon(
+                            Icons.mic_rounded,
+                            color: Colors.white.withOpacity(0.4),
+                          ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -86,160 +252,237 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Category Chips
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 50,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  return CategoryChip(
-                    label: categories[index],
-                    isSelected: _selectedCategory == categories[index],
-                    onTap: () {
-                      setState(() {
-                        _selectedCategory = categories[index];
-                      });
-                    },
-                  );
-                },
+          // Show search results if searching
+          if (_isSearching && _searchResults.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Text(
+                  'Search Results (${_searchResults.length})',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // Trending Now
-          SliverToBoxAdapter(
-            child: Padding(
+            SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Trending Now',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.65,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    return MovieCard(
+                      movie: _searchResults[index],
+                      showRating: true,
+                    );
+                  },
+                  childCount: _searchResults.length,
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ] else if (_isSearching && _searchResults.isEmpty) ...[
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off_rounded,
+                      size: 64,
+                      color: Colors.white.withOpacity(0.3),
                     ),
-                  ),
-                  TextButton(onPressed: () {}, child: const Text('See All')),
-                ],
-              ),
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 300,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: Movie.trendingMovies.length,
-                itemBuilder: (context, index) {
-                  return MovieCard(
-                    movie: Movie.trendingMovies[index],
-                    width: 160,
-                    height: 240,
-                  );
-                },
-              ),
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-          // Top Rated
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Top Rated',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 16),
+                    Text(
+                      'No results found',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  TextButton(onPressed: () {}, child: const Text('See All')),
-                ],
-              ),
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 240,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: Movie.topRatedMovies.length,
-                itemBuilder: (context, index) {
-                  return MovieCard(
-                    movie: Movie.topRatedMovies[index],
-                    width: 140,
-                    height: 180,
-                    showRating: true,
-                  );
-                },
-              ),
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-          // Recommended
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: Color(0xFF6366F1),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Recommended For You',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try searching for something else',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.4),
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+          ] else ...[
+            // Category Chips
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 50,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    return CategoryChip(
+                      label: categories[index],
+                      isSelected: _selectedCategory == categories[index],
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = categories[index];
+                        });
+                        _loadMoviesByCategory(categories[index]);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 260,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
+            // Trending Now
+            SliverToBoxAdapter(
+              child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: Movie.recommendedMovies.length,
-                itemBuilder: (context, index) {
-                  return MovieCard(
-                    movie: Movie.recommendedMovies[index],
-                    width: 140,
-                    height: 180,
-                  );
-                },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Trending Now',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(onPressed: () {}, child: const Text('See All')),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 300,
+                child: _isLoadingTrending
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _trendingMovies.length,
+                        itemBuilder: (context, index) {
+                          return MovieCard(
+                            movie: _trendingMovies[index],
+                            width: 160,
+                            height: 240,
+                          );
+                        },
+                      ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+
+            // Top Rated
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Top Rated',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(onPressed: () {}, child: const Text('See All')),
+                  ],
+                ),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 240,
+                child: _isLoadingTopRated
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _topRatedMovies.length,
+                        itemBuilder: (context, index) {
+                          return MovieCard(
+                            movie: _topRatedMovies[index],
+                            width: 140,
+                            height: 180,
+                            showRating: true,
+                          );
+                        },
+                      ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+
+            // Recommended
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: Color(0xFF6366F1),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Recommended For You',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 260,
+                child: _isLoadingRecommended
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _recommendedMovies.length,
+                        itemBuilder: (context, index) {
+                          return MovieCard(
+                            movie: _recommendedMovies[index],
+                            width: 140,
+                            height: 180,
+                          );
+                        },
+                      ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
         ],
       ),
     );
@@ -247,6 +490,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
