@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/movie.dart';
 import '../services/api_constants.dart';
+import '../screens/movie_detail_screen.dart';
 
 class MovieCard extends StatelessWidget {
   final Movie movie;
@@ -22,7 +23,7 @@ class MovieCard extends StatelessWidget {
     if (width == null || height == null) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          return _buildCard(
+          return _buildCard( context,
             constraints.maxWidth,
             constraints.maxHeight,
           );
@@ -30,17 +31,26 @@ class MovieCard extends StatelessWidget {
       );
     }
     
-    return _buildCard(width!, height!);
+    return _buildCard(context, width!, height!);
   }
 
-  Widget _buildCard(double cardWidth, double cardHeight) {
-    return Container(
-      width: cardWidth == double.infinity ? null : cardWidth,
-      height: cardHeight == double.infinity ? null : cardHeight,
-      margin: cardWidth == double.infinity ? null : const EdgeInsets.only(right: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
+  Widget _buildCard(BuildContext context, double cardWidth, double cardHeight) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MovieDetailScreen(movie: movie),
+          ),
+        );
+      },
+      child: Container(
+        width: cardWidth == double.infinity ? null : cardWidth,
+        height: cardHeight == double.infinity ? null : cardHeight,
+        margin: cardWidth == double.infinity ? null : const EdgeInsets.only(right: 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
           fit: StackFit.expand,
           children: [
             // Background color based on imageColor
@@ -181,6 +191,7 @@ class MovieCard extends StatelessWidget {
               ),
             ),
           ],
+          ),
         ),
       ),
     );
