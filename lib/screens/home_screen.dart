@@ -3,6 +3,7 @@ import '../widget/movie_card.dart';
 import '../widget/category_chip.dart';
 import '../models/movie.dart';
 import '../services/tmdb_service.dart';
+import 'browse_movies_screen.dart' show BrowseMoviesScreen, BrowseCategory;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -14,13 +15,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   final TMDBService _tmdbService = TMDBService();
-  
+
   String _selectedCategory = 'All';
   List<Movie> _trendingMovies = [];
   List<Movie> _topRatedMovies = [];
   List<Movie> _recommendedMovies = [];
   List<Movie> _searchResults = [];
-  
+
   bool _isLoadingTrending = true;
   bool _isLoadingTopRated = true;
   bool _isLoadingRecommended = true;
@@ -57,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _performSearch(String query) async {
     setState(() => _isSearching = true);
-    
+
     try {
       final results = await _tmdbService.searchMovies(query);
       if (mounted) {
@@ -71,13 +72,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadMovies() async {
-    // Load trending movies
     _loadTrendingMovies();
-    
-    // Load top rated movies
     _loadTopRatedMovies();
-    
-    // Load recommended movies (using upcoming as recommendation)
     _loadRecommendedMovies();
   }
 
@@ -180,6 +176,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _navigateToBrowse(BrowseCategory category) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BrowseMoviesScreen(
+          category: category,
+          genreFilter: _selectedCategory,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -256,7 +264,10 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_isSearching && _searchResults.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Text(
                   'Search Results (${_searchResults.length})',
                   style: const TextStyle(
@@ -276,15 +287,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    return MovieCard(
-                      movie: _searchResults[index],
-                      showRating: true,
-                    );
-                  },
-                  childCount: _searchResults.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  return MovieCard(
+                    movie: _searchResults[index],
+                    showRating: true,
+                  );
+                }, childCount: _searchResults.length),
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -347,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-            // Trending Now
+            // Trending Now Section
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -362,7 +370,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    TextButton(onPressed: () {}, child: const Text('See All')),
+                    TextButton(
+                      onPressed: () =>
+                          _navigateToBrowse(BrowseCategory.trending),
+                      child: const Text(
+                        'See All',
+                        style: TextStyle(
+                          color: Color(0xFF6366F1),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -372,7 +391,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SizedBox(
                 height: 300,
                 child: _isLoadingTrending
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF6366F1),
+                        ),
+                      )
                     : ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -390,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-            // Top Rated
+            // Top Rated Section
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -405,7 +428,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    TextButton(onPressed: () {}, child: const Text('See All')),
+                    TextButton(
+                      onPressed: () =>
+                          _navigateToBrowse(BrowseCategory.topRated),
+                      child: const Text(
+                        'See All',
+                        style: TextStyle(
+                          color: Color(0xFF6366F1),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -415,7 +449,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SizedBox(
                 height: 240,
                 child: _isLoadingTopRated
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF6366F1),
+                        ),
+                      )
                     : ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -434,24 +472,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-            // Recommended
+            // Recommended Section
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(
-                      Icons.auto_awesome_rounded,
-                      color: Color(0xFF6366F1),
-                      size: 20,
+                    Row(
+                      children: const [
+                        Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Color(0xFF6366F1),
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Recommended For You',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Recommended For You',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                    TextButton(
+                      onPressed: () =>
+                          _navigateToBrowse(BrowseCategory.recommended),
+                      child: const Text(
+                        'See All',
+                        style: TextStyle(
+                          color: Color(0xFF6366F1),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -465,7 +520,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SizedBox(
                 height: 260,
                 child: _isLoadingRecommended
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF6366F1),
+                        ),
+                      )
                     : ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
