@@ -11,6 +11,9 @@ class AuthService {
   late final GoogleSignIn _googleSignIn;
 
   AuthService() {
+    // Enable auth state persistence
+    _enablePersistence();
+    
     if (kIsWeb) {
       // For web, you MUST provide the Web Client ID
       // Get it from: Firebase Console > Project Settings > Your apps > Web app
@@ -31,6 +34,19 @@ class AuthService {
     } else {
       // For mobile (Android/iOS), no clientId needed
       _googleSignIn = GoogleSignIn();
+    }
+  }
+
+  /// Enable auth state persistence
+  Future<void> _enablePersistence() async {
+    try {
+      if (kIsWeb) {
+        // For web, set persistence to LOCAL (survives browser restart)
+        await _auth.setPersistence(Persistence.LOCAL);
+      }
+      // Mobile platforms have persistence enabled by default
+    } catch (e) {
+      print('Error enabling persistence: $e');
     }
   }
 

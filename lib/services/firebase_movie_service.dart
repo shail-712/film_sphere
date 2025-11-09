@@ -12,13 +12,15 @@ class FirebaseMovieService {
   // Add or update movie in user's list
   Future<void> addMovieToList({
     required Movie movie,
-    required String status, // favourite, planning, watching, completed, dropped
+    required String status, // planning, watching, completed, dropped
     double? userScore,
     String? notes,
   }) async {
     if (currentUserId == null) throw Exception('User not authenticated');
 
     final docId = '${currentUserId}_${movie.id}';
+    // FIXED: Never use 'favourite' as status, always use 'completed' with isFavourite flag
+    final actualStatus = status == 'favourite' ? 'completed' : status.toLowerCase();
     final isFavourite = status == 'favourite';
     final now = Timestamp.now();
 
@@ -31,7 +33,7 @@ class FirebaseMovieService {
       'movieGenre': movie.genre,
       'movieYear': movie.year,
       'movieRating': movie.rating,
-      'status': status.toLowerCase(),
+      'status': actualStatus,
       'userScore': userScore,
       'addedAt': now,
       'updatedAt': now,
@@ -39,8 +41,8 @@ class FirebaseMovieService {
       'notes': notes,
     };
 
-    // If status is completed or favourite, add completedAt
-    if (status.toLowerCase() == 'completed' || isFavourite) {
+    // If status is completed (including favourites), add completedAt
+    if (actualStatus == 'completed') {
       data['completedAt'] = now;
     }
 
@@ -99,19 +101,16 @@ class FirebaseMovieService {
     final doc = await _firestore.collection('user_movies').doc(docId).get();
 
     if (doc.exists) {
-      // Update existing entry
+      // FIXED: Keep status as 'completed' when toggling favorite
+      final currentStatus = doc.data()?['status'];
       await _firestore.collection('user_movies').doc(docId).update({
         'isFavourite': isFavorite,
-        'status': isFavorite
-            ? 'favourite'
-            : (doc.data()?['status'] ?? 'completed'),
-        'completedAt': isFavorite
-            ? Timestamp.now()
-            : doc.data()?['completedAt'],
+        'status': isFavorite ? 'completed' : (currentStatus ?? 'completed'),
+        'completedAt': isFavorite ? Timestamp.now() : doc.data()?['completedAt'],
         'updatedAt': Timestamp.now(),
       });
     } else if (isFavorite) {
-      // Add as favorite
+      // Add as favorite (status = completed, isFavourite = true)
       await addMovieToList(movie: movie, status: 'favourite');
     }
 
@@ -164,6 +163,7 @@ class FirebaseMovieService {
               'userScore': data['userScore'],
               'updatedAt': data['updatedAt'],
               'notes': data['notes'],
+              'isFavourite': data['isFavourite'] ?? false,
             });
           }
         }
@@ -196,10 +196,6 @@ class FirebaseMovieService {
       if (status != null && counts.containsKey(status.toLowerCase())) {
         counts[status.toLowerCase()] = (counts[status.toLowerCase()] ?? 0) + 1;
       }
-      // Count favorites as completed
-      if (status == 'favourite') {
-        counts['completed'] = (counts['completed'] ?? 0) + 1;
-      }
     }
 
     return counts;
@@ -226,9 +222,9 @@ class FirebaseMovieService {
         final data = doc.data();
         final status = (data['status'] as String?)?.toLowerCase();
 
+        // FIXED: Count completed movies (including favourites via isFavourite flag)
         switch (status) {
           case 'completed':
-          case 'favourite':
             totalWatched++;
             break;
           case 'planning':

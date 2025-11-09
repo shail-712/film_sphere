@@ -28,6 +28,10 @@ class FirebaseService {
     final docId = '${currentUserId}__$movieId';
     final now = Timestamp.now();
     
+    // FIXED: Never use 'favourite' as status, always use 'completed' with isFavourite flag
+    final actualStatus = status == 'favourite' ? 'completed' : status.toLowerCase();
+    final isActuallyFavourite = status == 'favourite' || isFavourite;
+    
     final data = {
       'userId': currentUserId,
       'movieId': movieId,
@@ -37,14 +41,14 @@ class FirebaseService {
       'movieGenre': movieGenre,
       'movieYear': movieYear,
       'movieRating': movieRating,
-      'status': status,
+      'status': actualStatus,
       'userScore': userScore,
-      'isFavourite': isFavourite,
+      'isFavourite': isActuallyFavourite,
       'updatedAt': now,
     };
 
-    // If adding to completed or favourite, set completedAt
-    if (status == 'completed' || isFavourite) {
+    // If adding to completed (including favourites), set completedAt
+    if (actualStatus == 'completed') {
       data['completedAt'] = now;
     }
 
@@ -64,24 +68,32 @@ class FirebaseService {
     await _updateUserStats();
   }
 
-  /// Get user's movies by status
-  Stream<List<Map<String, dynamic>>> getUserMoviesByStatus(String status) {
-    if (currentUserId == null) return Stream.value([]);
+ /// Get user's movies by status
+Stream<List<Map<String, dynamic>>> getUserMoviesByStatus(String status) {
+  if (currentUserId == null) return Stream.value([]);
 
-    Query query = _firestore
-        .collection('user_movies')
-        .where('userId', isEqualTo: currentUserId);
+  Query query = _firestore
+      .collection('user_movies')
+      .where('userId', isEqualTo: currentUserId);
 
-    if (status != 'all') {
-      query = query.where('status', isEqualTo: status);
-    }
-
-    return query.orderBy('addedAt', descending: true).snapshots().map(
-      (snapshot) => snapshot.docs
-          .map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id})
-          .toList(),
-    );
+  if (status == 'favourite') {
+    // FIXED: Query for completed movies with isFavourite = true
+    query = query
+        .where('status', isEqualTo: 'completed')
+        .where('isFavourite', isEqualTo: true);
+  } else if (status == 'completed') {
+    // Show all completed movies (including favourites)
+    query = query.where('status', isEqualTo: 'completed');
+  } else if (status != 'all') {
+    query = query.where('status', isEqualTo: status);
   }
+
+  return query.orderBy('addedAt', descending: true).snapshots().map(
+    (snapshot) => snapshot.docs
+        .map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id})
+        .toList(),
+  );
+}
 
   /// Get a specific user movie
   Future<Map<String, dynamic>?> getUserMovie(int movieId) async {
@@ -551,11 +563,13 @@ class FirebaseService {
 
   // ==================== HELPER METHODS ====================
 
-  /// Update user stats
-  Future<void> _updateUserStats() async {
-    if (currentUserId == null) return;
+/// Update user statistics (FIXED version)
+Future<void> _updateUserStats() async {
+  if (currentUserId == null) return;
 
-    final moviesSnapshot = await _firestore
+  try {
+    // Get all user movies
+    final userMoviesSnapshot = await _firestore
         .collection('user_movies')
         .where('userId', isEqualTo: currentUserId)
         .get();
@@ -566,11 +580,12 @@ class FirebaseService {
     double totalRating = 0;
     int ratedCount = 0;
 
-    for (var doc in moviesSnapshot.docs) {
+    for (var doc in userMoviesSnapshot.docs) {
       final data = doc.data();
       final status = data['status'];
       
-      if (status == 'completed' || data['isFavourite'] == true) {
+      // FIXED: Count completed movies (favourites are also completed)
+      if (status == 'completed') {
         totalWatched++;
       } else if (status == 'planning') {
         totalPlanning++;
@@ -590,7 +605,10 @@ class FirebaseService {
       'stats.totalDropped': totalDropped,
       'stats.averageRating': ratedCount > 0 ? totalRating / ratedCount : 0,
     });
+  } catch (e) {
+    print('Error updating user stats: $e');
   }
+}
 
   /// Add post to followers' feeds (for feed cache optimization)
   Future<void> _addPostToFollowerFeeds(String postId) async {

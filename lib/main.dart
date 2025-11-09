@@ -8,7 +8,9 @@ import 'screens/home_screen.dart';
 import 'screens/social_screen.dart';
 import 'screens/watchlist_screen.dart';
 import 'screens/profile_screen.dart';
-
+import 'screens/movie_detail_screen.dart';
+import 'screens/browse_movies_screen.dart';
+import 'models/movie.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -16,9 +18,20 @@ Future<void> main() async {
   await dotenv.load(fileName: ".env");
 
   // Initialize Firebase
+  print('📄 Initializing Firebase...');
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  print('✅ Firebase initialized');
+  
+  // Check if user is already signed in
+  final authService = AuthService();
+  final currentUser = authService.currentUser;
+  if (currentUser != null) {
+    print('✅ User already signed in: ${currentUser.email}');
+  } else {
+    print('ℹ️ No user signed in');
+  }
   
   runApp(const MovieApp());
 }
@@ -46,6 +59,39 @@ class MovieApp extends StatelessWidget {
       ),
       home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
+      // Add basic routes that don't require arguments
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const MainScreen(),
+      },
+      // Handle routes with arguments
+      onGenerateRoute: (settings) {
+        // Handle movie detail route with Movie object argument
+        if (settings.name == '/movie-detail') {
+          final movie = settings.arguments as Movie?;
+          if (movie != null) {
+            return MaterialPageRoute(
+              builder: (context) => MovieDetailScreen(movie: movie),
+            );
+          }
+        }
+        
+        // Handle browse movies route with category argument
+        if (settings.name == '/browse') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          if (args != null) {
+            return MaterialPageRoute(
+              builder: (context) => BrowseMoviesScreen(
+                category: args['category'] as BrowseCategory,
+                genreFilter: args['genreFilter'] as String?,
+              ),
+            );
+          }
+        }
+        
+        // Return null for unknown routes
+        return null;
+      },
     );
   }
 }
@@ -61,6 +107,10 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder(
       stream: authService.authStateChanges,
       builder: (context, snapshot) {
+        // Add debug logging
+        print('🔍 Auth State: ${snapshot.connectionState}');
+        print('👤 User: ${snapshot.data?.email ?? "No user"}');
+
         // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -87,10 +137,12 @@ class AuthWrapper extends StatelessWidget {
 
         // User is signed in - show main app
         if (snapshot.hasData && snapshot.data != null) {
+          print('✅ User is authenticated, showing main screen');
           return const MainScreen();
         }
 
         // User is not signed in - show login screen
+        print('❌ No user, showing login screen');
         return const LoginScreen();
       },
     );

@@ -86,46 +86,45 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     }
   }
 
-  Future<void> _addToList(String status) async {
-    try {
-      await _movieService.addMovieToList(
-        movie: widget.movie,
-        status: status,
-        userScore: _userScore,
+// Update _addToList method to handle the removal of 'favourite' option:
+Future<void> _addToList(String status) async {
+  try {
+    await _movieService.addMovieToList(
+      movie: widget.movie,
+      status: status, // Will be planning, watching, completed, or dropped
+      userScore: _userScore,
+    );
+
+    if (mounted) {
+      setState(() {
+        _isInList = true;
+        _currentStatus = status;
+        // REMOVED: if (status == 'favourite') { _isFavorite = true; }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Added to ${_formatStatus(status)}'),
+          backgroundColor: const Color(0xFF6366F1),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
+    }
 
-      if (mounted) {
-        setState(() {
-          _isInList = true;
-          _currentStatus = status;
-          if (status == 'favourite') {
-            _isFavorite = true;
-          }
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added to ${_formatStatus(status)}'),
-            backgroundColor: const Color(0xFF6366F1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-
-      // Reload data
-      _loadMovieData();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+    // Reload data
+    _loadMovieData();
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
+}
 
   Future<void> _toggleFavorite() async {
     try {
@@ -555,6 +554,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                                 color: Colors.white,
                               ),
                             ),
+                            // OPTIONAL: Add a heart indicator if it's a favourite
+                            if (_isInList && _isFavorite) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.favorite,
+                                size: 16,
+                                color: Colors.red,
+                              ),
+                            ],
                           ],
                         ),
                       ),

@@ -336,23 +336,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     icon: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'G',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF4285F4),
+                        width: 24,
+                        height: 24,
+                        child: Center(
+                          child: Image.network(
+                            'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/2048px-Google_%22G%22_logo.svg.png',
+                            width: 18,
+                            height: 18,
                           ),
                         ),
                       ),
-                    ),
                     label: const Text(
                       'Continue with Google',
                       style: TextStyle(
