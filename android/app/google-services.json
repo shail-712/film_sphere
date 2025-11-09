@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1072410230729",
+    "project_id": "film-sphere",
+    "storage_bucket": "film-sphere.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1072410230729:android:06aa5836220b14b5c3f218",
+        "android_client_info": {
+          "package_name": "com.example.film_sphere"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1072410230729-ur9j13cag93fvs5fp1hu5nbn6mljbafd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.film_sphere",
+            "certificate_hash": "1c30a02690d192eb19bdb0bf275a68700bd3b793"
+          }
+        },
+        {
+          "client_id": "1072410230729-7mpqgk0nh5gci51gn8vma9kfor0dthkf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-wFL_ilxiRGLLuaOASLvmcp2YzwV2MI4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1072410230729-7mpqgk0nh5gci51gn8vma9kfor0dthkf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

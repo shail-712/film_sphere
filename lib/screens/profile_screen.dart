@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import '../widget/stat_card.dart';
 import '../models/movie.dart';
+import '../services/auth_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final authService = AuthService();
+    final user = authService.currentUser;
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -31,36 +35,44 @@ class ProfileScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 40),
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF6366F1),
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'SS',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
+                    // Profile Image
+                    user?.photoURL != null
+                        ? CircleAvatar(
+                            radius: 40,
+                            backgroundImage: NetworkImage(user!.photoURL!),
+                          )
+                        : Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF6366F1),
+                              border: Border.all(color: Colors.white, width: 3),
+                            ),
+                            child: Center(
+                              child: Text(
+                                user?.displayName?.substring(0, 1).toUpperCase() ?? 
+                                user?.email?.substring(0, 1).toUpperCase() ?? 
+                                'U',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Shail Shaji',
-                      style: TextStyle(
+                    Text(
+                      user?.displayName ?? 'User',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      '@shailshaji',
+                      user?.email ?? '',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.6),
                         fontSize: 14,
@@ -226,19 +238,34 @@ class ProfileScreen extends StatelessWidget {
                   _buildSettingOption(
                     Icons.person_outline_rounded,
                     'Edit Profile',
+                    () {},
                   ),
-                  _buildSettingOption(Icons.privacy_tip_outlined, 'Privacy'),
+                  _buildSettingOption(
+                    Icons.privacy_tip_outlined,
+                    'Privacy',
+                    () {},
+                  ),
                   _buildSettingOption(
                     Icons.notifications_outlined,
                     'Notifications',
+                    () {},
                   ),
                   _buildSettingOption(
                     Icons.help_outline_rounded,
                     'Help & Support',
+                    () {},
                   ),
                   _buildSettingOption(
                     Icons.logout_rounded,
                     'Logout',
+                    () async {
+                      // Show confirmation dialog
+                      final shouldLogout = await _showLogoutDialog(context);
+                      if (shouldLogout == true) {
+                        await authService.signOut();
+                        // Navigation to login screen is handled automatically by AuthWrapper
+                      }
+                    },
                     isDestructive: true,
                   ),
                 ],
@@ -247,6 +274,39 @@ class ProfileScreen extends StatelessWidget {
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _showLogoutDialog(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Logout',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Are you sure you want to logout?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Logout'),
+          ),
         ],
       ),
     );
@@ -333,7 +393,8 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildSettingOption(
     IconData icon,
-    String label, {
+    String label,
+    VoidCallback onTap, {
     bool isDestructive = false,
   }) {
     return Container(
@@ -360,7 +421,7 @@ class ProfileScreen extends StatelessWidget {
           Icons.chevron_right_rounded,
           color: Colors.white.withOpacity(0.3),
         ),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }
