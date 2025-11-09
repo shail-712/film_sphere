@@ -185,8 +185,8 @@ class _SocialScreenState extends State<SocialScreen>
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: _showSearchUsers,
-                  icon: const Icon(Icons.person_add_rounded),
-                  label: const Text('Find Users'),
+                  icon: const Icon(Icons.person_add_rounded, color: Colors.white,),
+                  label: const Text('Find Users', style: TextStyle(color: Colors.white),),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6366F1),
                     padding: const EdgeInsets.symmetric(

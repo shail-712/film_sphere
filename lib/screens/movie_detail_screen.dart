@@ -170,7 +170,7 @@ Future<void> _addToList(String status) async {
                 );
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Shared to feed!')),
+                  const SnackBar(content: Text('Shared to feed!', style: TextStyle(color: Colors.white),)),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -181,7 +181,7 @@ Future<void> _addToList(String status) async {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF6366F1),
             ),
-            child: const Text('Share'),
+            child: const Text('Share', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

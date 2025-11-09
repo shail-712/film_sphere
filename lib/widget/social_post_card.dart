@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import '../services/tmdb_service.dart';
+import '../models/movie.dart';
+import '../services/api_constants.dart';
+import '../screens/movie_detail_screen.dart';
 
 class SocialPostCard extends StatelessWidget {
   final Map<String, dynamic> post;
@@ -101,10 +105,14 @@ class SocialPostCard extends StatelessWidget {
           ),
 
           // Shared Movie/Review (if applicable)
-          if (post['postType'] == 'movie_share' && post['movieId'] != null)
-            _buildMovieShare(),
-          if (post['postType'] == 'review_share' && post['reviewId'] != null)
-            _buildReviewShare(),
+          if (post['postType'] == 'movie_share' && post['movieId'] != null) ...[
+            const SizedBox(height: 12),
+            _buildMovieShare(context),
+          ],
+          if (post['postType'] == 'review_share' && post['reviewId'] != null) ...[
+            const SizedBox(height: 12),
+            _buildReviewShare(context),
+          ],
 
           const SizedBox(height: 16),
 
@@ -194,56 +202,186 @@ class SocialPostCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMovieShare() {
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: 60,
-              height: 90,
-              color: Colors.grey.shade800,
-              child: const Icon(Icons.movie_rounded, color: Colors.white54),
+  Widget _buildMovieShare(BuildContext context) {
+    final movieId = post['movieId'];
+    
+    return FutureBuilder<Movie?>(
+      future: _fetchMovieDetails(movieId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+
+        final movie = snapshot.data;
+        if (movie == null) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: Row(
               children: [
-                Text(
-                  'Shared Movie',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  width: 60,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade800,
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: const Icon(Icons.movie_rounded, color: Colors.white54),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  'Tap to view details',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 12,
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Movie not found',
+                    style: TextStyle(color: Colors.white54, fontSize: 14),
                   ),
                 ),
               ],
             ),
+          );
+        }
+
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MovieDetailScreen(movie: movie),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: (movie.posterPath?.isNotEmpty ?? false)
+                      ? Image.network(
+                          ApiConstants.getPosterUrl(movie.posterPath!),
+                          width: 60,
+                          height: 90,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 60,
+                              height: 90,
+                              color: Colors.grey.shade800,
+                              child: const Icon(Icons.movie_rounded, color: Colors.white54),
+                            );
+                          },
+                        )
+                      : Container(
+                          width: 60,
+                          height: 90,
+                          color: Colors.grey.shade800,
+                          child: const Icon(Icons.movie_rounded, color: Colors.white54),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        movie.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.star_rounded,
+                            size: 14,
+                            color: Colors.amber.shade600,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            movie.rating.toStringAsFixed(1),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            movie.year.toString(),
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        movie.genre,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildReviewShare() {
+  Future<Movie?> _fetchMovieDetails(int movieId) async {
+  try {
+    final tmdbService = TMDBService();
+    final movieDetailsMap = await tmdbService.getMovieDetails(movieId.toString());
+    
+    if (movieDetailsMap == null) {
+      return null;
+    }
+    
+    // Convert the Map to a Movie object using Movie.fromJson
+    return Movie.fromJson(movieDetailsMap);
+  } catch (e) {
+    print('Error fetching movie: $e');
+    return null;
+  }
+}
+
+  Widget _buildReviewShare(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),

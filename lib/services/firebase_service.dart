@@ -639,94 +639,110 @@ Future<void> _updateUserStats() async {
     await batch.commit();
   }
 
-  /// Get post comments
-  Stream<List<Map<String, dynamic>>> getPostComments(String postId) {
-    return _firestore
-        .collection('post_comments')
-        .where('postId', isEqualTo: postId)
-        .orderBy('createdAt', descending: false)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => {...doc.data(), 'id': doc.id})
-              .toList(),
-        );
-  }
+ /// Get post comments
+Stream<List<Map<String, dynamic>>> getPostComments(String postId) {
+  return _firestore
+      .collection('post_comments')
+      .where('postId', isEqualTo: postId)
+      .orderBy('createdAt', descending: false)
+      .snapshots()
+      .map(
+        (snapshot) => snapshot.docs
+            .map((doc) => {...doc.data(), 'id': doc.id})
+            .toList(),
+      );
+}
 
-  /// Get user's interaction with a post
-  Future<String?> getPostInteraction(String postId) async {
-    if (currentUserId == null) return null;
+/// Get user's interaction with a post
+Future<String?> getPostInteraction(String postId) async {
+  if (currentUserId == null) return null;
 
-    final interactionId = '${postId}__$currentUserId';
-    final doc = await _firestore
-        .collection('post_interactions')
-        .doc(interactionId)
-        .get();
+  final interactionId = '${postId}__$currentUserId';
+  final doc = await _firestore
+      .collection('post_interactions')
+      .doc(interactionId)
+      .get();
 
-    return doc.exists ? doc.data()!['interactionType'] : null;
-  }
+  return doc.exists ? doc.data()!['interactionType'] : null;
+}
 
-  /// Search users by username or display name
-  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
-    if (query.trim().isEmpty) return [];
+/// Search users by username or display name (FIXED VERSION)
+Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+  if (query.trim().isEmpty) return [];
 
-    final lowercaseQuery = query.toLowerCase();
-
-    // Search by username
-    final usernameSnapshot = await _firestore
+  try {
+    final lowercaseQuery = query.toLowerCase().trim();
+    
+    // Get all users and filter client-side
+    // This is more reliable than Firestore's text search
+    final usersSnapshot = await _firestore
         .collection('users')
-        .where('username', isGreaterThanOrEqualTo: lowercaseQuery)
-        .where('username', isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
-        .limit(20)
-        .get();
-
-    // Search by display name
-    final displayNameSnapshot = await _firestore
-        .collection('users')
-        .where('displayName', isGreaterThanOrEqualTo: lowercaseQuery)
-        .where('displayName', isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
-        .limit(20)
+        .limit(100) // Limit to prevent loading too many users
         .get();
 
     final users = <Map<String, dynamic>>[];
-    final seenIds = <String>{};
 
-    // Combine results and remove duplicates
-    for (var doc in [...usernameSnapshot.docs, ...displayNameSnapshot.docs]) {
-      if (!seenIds.contains(doc.id) && doc.id != currentUserId) {
-        seenIds.add(doc.id);
-        users.add({...doc.data(), 'id': doc.id});
+    for (var doc in usersSnapshot.docs) {
+      // Skip current user
+      if (doc.id == currentUserId) continue;
+
+      final data = doc.data();
+      final username = (data['username'] as String?)?.toLowerCase() ?? '';
+      final displayName = (data['displayName'] as String?)?.toLowerCase() ?? '';
+
+      // Check if query matches username or display name
+      if (username.contains(lowercaseQuery) || displayName.contains(lowercaseQuery)) {
+        users.add({...data, 'id': doc.id});
       }
     }
 
     return users;
+  } catch (e) {
+    print('Error searching users: $e');
+    return [];
   }
+}
 
-  /// Get user profile by ID
-  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+/// Get user profile by ID
+Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+  try {
     final doc = await _firestore.collection('users').doc(userId).get();
     if (doc.exists) {
       return {...doc.data()!, 'id': doc.id};
     }
     return null;
+  } catch (e) {
+    print('Error getting user profile: $e');
+    return null;
   }
+}
 
-  /// Get follower count
-  Future<int> getFollowerCount(String userId) async {
+/// Get follower count
+Future<int> getFollowerCount(String userId) async {
+  try {
     final snapshot = await _firestore
         .collection('followers')
         .where('followingId', isEqualTo: userId)
         .get();
     return snapshot.docs.length;
+  } catch (e) {
+    print('Error getting follower count: $e');
+    return 0;
   }
+}
 
-  /// Get following count
-  Future<int> getFollowingCount(String userId) async {
+/// Get following count
+Future<int> getFollowingCount(String userId) async {
+  try {
     final snapshot = await _firestore
         .collection('followers')
         .where('followerId', isEqualTo: userId)
         .get();
     return snapshot.docs.length;
+  } catch (e) {
+    print('Error getting following count: $e');
+    return 0;
   }
+}
 }
 
