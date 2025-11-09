@@ -5,6 +5,9 @@ import '../services/tmdb_service.dart';
 import '../services/firebase_movie_service.dart';
 import '../widget/movie_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'movie_reviews_screen.dart';
+import 'write_review_screen.dart';
+import '../services/firebase_service.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final Movie movie;
@@ -18,6 +21,7 @@ class MovieDetailScreen extends StatefulWidget {
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
   final TMDBService _tmdbService = TMDBService();
   final FirebaseMovieService _movieService = FirebaseMovieService();
+  final FirebaseService _firebaseService = FirebaseService();
 
   Map<String, dynamic>? _movieDetails;
   Map<String, dynamic>? _credits;
@@ -125,6 +129,64 @@ Future<void> _addToList(String status) async {
     }
   }
 }
+
+  Future<void> _shareMovieToFeed() async {
+    final textController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'Share to Feed',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: textController,
+          style: const TextStyle(color: Colors.white),
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Add a caption...',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await _firebaseService.createSocialPost(
+                  postText: textController.text.trim().isEmpty 
+                      ? 'Check out ${widget.movie.title}!'
+                      : textController.text.trim(),
+                  postType: 'movie_share',
+                  movieId: int.parse(widget.movie.id),
+                );
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Shared to feed!')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+            ),
+            child: const Text('Share'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _toggleFavorite() async {
     try {
@@ -310,7 +372,7 @@ Future<void> _addToList(String status) async {
                   ),
                   child: const Icon(Icons.share_rounded, color: Colors.white),
                 ),
-                onPressed: () {},
+                onPressed: () => _shareMovieToFeed(),
               ),
               IconButton(
                 icon: Container(
@@ -844,6 +906,271 @@ Future<void> _addToList(String status) async {
     );
   }
 
+  // In your movie detail screen widget
+
+Widget _buildReviewsSection() {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            const Text(
+              'Reviews',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () => _navigateToAllReviews(),
+              child: const Text(
+                'See All',
+                style: TextStyle(
+                  color: Color(0xFF6366F1),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      _buildReviewPreview(),
+      const SizedBox(height: 16),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _navigateToWriteReview(),
+            icon: const Icon(Icons.rate_review_rounded),
+            label: const Text('Write a Review'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildReviewPreview() {
+  return StreamBuilder<List<Map<String, dynamic>>>(
+    stream: _firebaseService.getMovieReviews(int.parse(widget.movie.id)),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      final reviews = snapshot.data ?? [];
+
+      if (reviews.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.rate_review_outlined,
+                    size: 48,
+                    color: Colors.white.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No reviews yet',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Be the first to review this movie!',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Show first 2 reviews
+      return Column(
+        children: reviews.take(2).map((review) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildReviewPreviewCard(review),
+          );
+        }).toList(),
+      );
+    },
+  );
+}
+
+Widget _buildReviewPreviewCard(Map<String, dynamic> review) {
+  final reviewScore = review['reviewScore'] ?? 0.0;
+  final reviewText = review['reviewText'] ?? '';
+  final previewText = reviewText.length > 150 
+      ? '${reviewText.substring(0, 150)}...' 
+      : reviewText;
+
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 20),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1A1A1A),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.white.withOpacity(0.1)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: const Color(0xFF6366F1),
+              child: Text(
+                (review['userId'] ?? 'U')[0].toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'User Review',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _getScoreColor(reviewScore),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star_rounded, size: 12, color: Colors.white),
+                  const SizedBox(width: 4),
+                  Text(
+                    reviewScore.toStringAsFixed(1),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          previewText,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
+            height: 1.5,
+          ),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(
+              Icons.thumb_up_outlined,
+              size: 16,
+              color: Colors.white.withOpacity(0.5),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${review['likesCount'] ?? 0}',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 16,
+              color: Colors.white.withOpacity(0.5),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${review['commentsCount'] ?? 0}',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Color _getScoreColor(double score) {
+  if (score >= 8.0) return Colors.green.shade600;
+  if (score >= 6.0) return Colors.orange.shade600;
+  if (score >= 4.0) return Colors.amber.shade700;
+  return Colors.red.shade600;
+}
+
+void _navigateToAllReviews() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => MovieReviewsScreen(movie: widget.movie),
+    ),
+  );
+}
+
+void _navigateToWriteReview() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => WriteReviewScreen(movie: widget.movie),
+    ),
+  );
+}
   Widget _buildStatusCard(String label, int count, IconData icon, Color color) {
     return Expanded(
       child: Container(
